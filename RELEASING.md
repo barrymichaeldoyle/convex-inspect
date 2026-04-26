@@ -24,6 +24,7 @@ Automated flow:
 - merge to `main`
 - the release workflow opens or updates a `Version Packages` PR
 - merge that PR to publish to npm automatically
+- npm publishing is configured for trusted publishing via GitHub Actions
 
 Local/manual flow if needed:
 
@@ -40,3 +41,4 @@ pnpm release
 - Keep the package version in `packages/core/package.json` as the source of truth.
 - Prefer one changeset per merged change or feature.
 - Do not create a changeset for docs-only changes unless they accompany a package change worth publishing.
+- The trusted publisher configuration on npm must exactly match the GitHub repository and workflow filename.
