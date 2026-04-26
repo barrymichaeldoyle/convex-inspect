@@ -1,3 +1,10 @@
 {
-  "extends": "astro/tsconfigs/strict"
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "paths": {
+      "convex-inspect": ["packages/core/src/index.ts"],
+      "convex-inspect/react": ["packages/core/src/react.tsx"]
+    }
+  }
 }

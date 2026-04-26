@@ -1,81 +1,117 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { convexPanelBus, type ConvexEvent, type ConvexEventType } from "./index.js";
 
-const STYLE_ID = "convex-panel-styles";
-if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
-  const style = document.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = `
-    @keyframes convex-panel-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.15; }
-    }
-    @keyframes convex-panel-in {
-      from { opacity: 0; transform: translateY(10px) scale(0.97); }
-      to   { opacity: 1; transform: translateY(0)    scale(1);    }
-    }
-    @keyframes convex-panel-out {
-      from { opacity: 1; transform: translateY(0)    scale(1);    }
-      to   { opacity: 0; transform: translateY(10px) scale(0.97); }
-    }
-    .convex-panel-fab {
-      transition: background 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease !important;
-    }
-    .convex-panel-fab:hover {
-      background: #27273a !important;
-      border-color: #45475a !important;
-      transform: scale(1.08) !important;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.5) !important;
-    }
-    .convex-panel-btn {
-      appearance: none;
-      -webkit-appearance: none;
-    }
-    .convex-panel-icon-btn:hover { color: #cdd6f4 !important; }
-    .convex-panel-row-summary {
-      transition: background 150ms ease;
-    }
-    .convex-panel-row-summary:hover {
-      background: rgba(69, 71, 90, 0.35);
-    }
-    .convex-panel-log-row {
-      overflow: hidden;
-      transition: box-shadow 120ms ease, background 120ms ease;
-    }
-    .convex-panel-log-row:last-child {
-      border-bottom: none !important;
-      border-bottom-left-radius: 12px;
-      border-bottom-right-radius: 12px;
-    }
-    .convex-panel-log-row:has(.convex-panel-row-summary:focus-visible) {
-      box-shadow: inset 0 0 0 1px #89b4fa !important;
-    }
-    .convex-panel-pre-wrap {
-      position: relative;
-    }
-    .convex-panel-copy-btn {
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
-    }
-    .convex-panel-pre-wrap:hover .convex-panel-copy-btn,
-    .convex-panel-pre-wrap:focus-within .convex-panel-copy-btn {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .convex-panel-root button:focus,
-    .convex-panel-row-summary:focus {
-      outline: none !important;
-      box-shadow: none !important;
-    }
-    .convex-panel-root button:focus-visible,
-    .convex-panel-row-summary:focus-visible {
-      outline: none !important;
-      box-shadow: none !important;
-    }
-  `;
-  document.head.appendChild(style);
-}
+const PANEL_HOST_ATTR = "data-convex-panel-host";
+const PANEL_CSS = `
+  .convex-panel-root,
+  .convex-panel-root *,
+  .convex-panel-root *::before,
+  .convex-panel-root *::after {
+    box-sizing: border-box;
+  }
+  .convex-panel-root {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    font-kerning: normal !important;
+    font-variant-ligatures: none !important;
+    text-indent: 0 !important;
+  }
+  .convex-panel-root button,
+  .convex-panel-root input,
+  .convex-panel-root select,
+  .convex-panel-root textarea {
+    margin: 0 !important;
+    color: inherit !important;
+    font: inherit !important;
+    letter-spacing: normal !important;
+    line-height: inherit !important;
+    text-transform: none !important;
+  }
+  @keyframes convex-panel-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.15; }
+  }
+  @keyframes convex-panel-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes convex-panel-out {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(10px) scale(0.97); }
+  }
+  .convex-panel-fab {
+    transition: background 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease !important;
+  }
+  .convex-panel-fab:hover {
+    background: #27273a !important;
+    border-color: #45475a !important;
+    transform: scale(1.08) !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5) !important;
+  }
+  .convex-panel-btn {
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .convex-panel-icon-btn {
+    transition: color 120ms ease, background 120ms ease;
+  }
+  .convex-panel-icon-btn:hover {
+    color: #cdd6f4 !important;
+    background: rgba(69, 71, 90, 0.45) !important;
+  }
+  .convex-panel-icon-btn[data-active="true"] {
+    color: #cdd6f4 !important;
+    background: rgba(137, 180, 250, 0.12) !important;
+  }
+  .convex-panel-icon-btn[data-active="true"]:hover {
+    background: rgba(137, 180, 250, 0.18) !important;
+  }
+  .convex-panel-row-summary {
+    transition: background 150ms ease;
+  }
+  .convex-panel-row-summary:hover {
+    background: rgba(69, 71, 90, 0.35);
+  }
+  .convex-panel-log-row {
+    overflow: hidden;
+    transition: box-shadow 120ms ease, background 120ms ease;
+  }
+  .convex-panel-log-row:last-child {
+    border-bottom: none !important;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+  }
+  .convex-panel-log-row:has(.convex-panel-row-summary:focus-visible) {
+    box-shadow: inset 0 0 0 1px #89b4fa !important;
+  }
+  .convex-panel-pre-wrap {
+    position: relative;
+  }
+  .convex-panel-copy-btn {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+  }
+  .convex-panel-pre-wrap:hover .convex-panel-copy-btn,
+  .convex-panel-pre-wrap:focus-within .convex-panel-copy-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .convex-panel-root button:focus,
+  .convex-panel-row-summary:focus {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  .convex-panel-root button:focus-visible,
+  .convex-panel-row-summary:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+`;
 
 function ConvexSymbol({ size = 16 }: { size?: number }) {
   return (
@@ -139,6 +175,7 @@ function writePref(key: string, val: boolean) {
 }
 
 export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [open, setOpen] = useState(() => readPref(LS_OPEN, defaultOpen));
   const [isClosing, setIsClosing] = useState(false);
   const [events, setEvents] = useState<ConvexEvent[]>([]);
@@ -157,6 +194,24 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
   const [seenCount, setSeenCount] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const host = document.createElement("div");
+    host.setAttribute(PANEL_HOST_ATTR, "");
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    const mount = document.createElement("div");
+    mount.setAttribute("data-convex-panel-mount", "");
+    shadowRoot.appendChild(mount);
+    document.body.appendChild(host);
+    setPortalRoot(mount);
+
+    return () => {
+      setPortalRoot(null);
+      host.remove();
+    };
+  }, []);
 
   function handleOpen() {
     setOpen(true);
@@ -193,166 +248,177 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
     writePref(LS_BADGE, val);
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={handleOpen}
-        style={styles.fab}
-        className="convex-panel-root convex-panel-fab"
-        aria-label="Open Convex Inspect"
-        aria-haspopup="dialog"
-      >
-        <ConvexSymbol size={30} />
-        {showBadge && events.length - seenCount > 0 && (
-          <span
-            aria-label={`${events.length - seenCount} new events`}
-            style={{
-              position: "absolute",
-              top: -3,
-              right: -3,
-              background: "#89b4fa",
-              color: "#1e1e2e",
-              borderRadius: 10,
-              fontSize: 9,
-              fontWeight: 700,
-              padding: "0 4px",
-              minWidth: 16,
-              height: 16,
-              boxSizing: "border-box",
-              textAlign: "center",
-              lineHeight: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+  if (!portalRoot) return null;
+
+  return createPortal(
+    <>
+      <style>{PANEL_CSS}</style>
+      {!open ? (
+        <button
+          type="button"
+          onClick={handleOpen}
+          style={styles.fab}
+          className="convex-panel-root convex-panel-fab"
+          aria-label="Open Convex Inspect"
+          aria-haspopup="dialog"
+        >
+          <ConvexSymbol size={30} />
+          {showBadge && events.length - seenCount > 0 && (
+            <span
+              aria-label={`${events.length - seenCount} new events`}
+              style={{
+                position: "absolute",
+                top: -3,
+                right: -3,
+                background: "#89b4fa",
+                color: "#1e1e2e",
+                borderRadius: 10,
+                fontSize: 9,
+                fontWeight: 700,
+                padding: "0 4px",
+                minWidth: 16,
+                height: 16,
+                textAlign: "center",
+                lineHeight: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {events.length - seenCount}
+            </span>
+          )}
+        </button>
+      ) : (
+        <div
+          role="dialog"
+          aria-label="Convex Inspect"
+          className="convex-panel-root"
+          style={{ ...styles.panel, animation: `${isClosing ? "convex-panel-out" : "convex-panel-in"} 180ms ease forwards` }}
+        >
+          <div style={styles.header}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ConvexSymbol size={20} />
+              <span style={styles.title}>Convex Inspect</span>
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={() => convexPanelBus.clear()}
+                style={styles.iconBtn}
+                className="convex-panel-btn convex-panel-icon-btn"
+                aria-label="Clear events"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowSettings((value) => !value); }}
+                style={styles.iconBtn}
+                className="convex-panel-btn convex-panel-icon-btn"
+                data-active={showSettings ? "true" : "false"}
+                aria-label="Toggle settings"
+                aria-expanded={showSettings}
+              >
+                Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowFilters((value) => !value); }}
+                style={styles.iconBtn}
+                className="convex-panel-btn convex-panel-icon-btn"
+                data-active={showFilters || filter !== "all" ? "true" : "false"}
+                aria-label="Toggle filters"
+                aria-expanded={showFilters}
+              >
+                Filter
+                {activeFilterColor && (
+                  <span
+                    aria-label={`Filtering ${filter} events`}
+                    style={{
+                      ...styles.filterIndicator,
+                      background: activeFilterColor,
+                      boxShadow: `0 0 0 2px ${styles.header.background as string}`,
+                    }}
+                  />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                style={styles.iconBtn}
+                className="convex-panel-btn convex-panel-icon-btn"
+                aria-label="Close Convex Inspect"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateRows: showSettings ? "1fr" : "0fr", transition: "grid-template-rows 200ms ease" }}>
+            <div style={{ overflow: "hidden" }}>
+              <div style={styles.settings} role="group" aria-label="Panel settings">
+                <SettingRow label="Show timestamps">
+                  <Toggle checked={showTimestamps} onChange={toggleTimestamps} aria-label="Show timestamps" tabIndex={showSettings ? undefined : -1} />
+                </SettingRow>
+                <SettingRow label="Show count badge">
+                  <Toggle checked={showBadge} onChange={toggleBadge} aria-label="Show count badge" tabIndex={showSettings ? undefined : -1} />
+                </SettingRow>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateRows: showFilters ? "1fr" : "0fr", transition: "grid-template-rows 200ms ease" }}>
+            <div style={{ overflow: "hidden" }}>
+              <div role="tablist" aria-label="Filter events" style={styles.filters}>
+                {(["all", "query", "mutation", "action"] as const).map((type) => (
+                  <button
+                    type="button"
+                    key={type}
+                    role="tab"
+                    aria-selected={filter === type}
+                    onClick={() => {
+                      setFilter(type);
+                      try {
+                        localStorage.setItem(LS_FILTER, type);
+                      } catch {}
+                    }}
+                    className="convex-panel-btn"
+                    tabIndex={showFilters ? undefined : -1}
+                    style={{
+                      ...styles.filterBtn,
+                      ...(filter === type ? styles.filterBtnActive : {}),
+                      ...(type !== "all" ? { color: COLORS[type].text } : {}),
+                    }}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div
+            ref={listRef}
+            role="log"
+            aria-label="Convex events"
+            aria-live="polite"
+            style={styles.list}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              atBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
             }}
           >
-            {events.length - seenCount}
-          </span>
-        )}
-      </button>
-    );
-  }
-
-  return (
-    <div
-      role="dialog"
-      aria-label="Convex Inspect"
-      className="convex-panel-root"
-      style={{ ...styles.panel, animation: `${isClosing ? "convex-panel-out" : "convex-panel-in"} 180ms ease forwards` }}
-    >
-      <div style={styles.header}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ConvexSymbol size={20} />
-          <span style={styles.title}>Convex Inspect</span>
-        </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <button
-            onClick={() => convexPanelBus.clear()}
-            style={styles.iconBtn}
-            className="convex-panel-btn convex-panel-icon-btn"
-            aria-label="Clear events"
-          >
-            Clear
-          </button>
-          <button
-            onClick={() => { const next = !showSettings; setShowSettings(next); if (next) setShowFilters(false); }}
-            style={{ ...styles.iconBtn, color: showSettings ? "#cdd6f4" : "#6c7086" }}
-            className="convex-panel-btn convex-panel-icon-btn"
-            aria-label="Toggle settings"
-            aria-expanded={showSettings}
-          >
-            Settings
-          </button>
-          <button
-            onClick={() => { const next = !showFilters; setShowFilters(next); if (next) setShowSettings(false); }}
-            style={{ ...styles.iconBtn, color: showFilters || filter !== "all" ? "#cdd6f4" : "#6c7086", position: "relative" }}
-            className="convex-panel-btn convex-panel-icon-btn"
-            aria-label="Toggle filters"
-            aria-expanded={showFilters}
-          >
-            Filter
-            {activeFilterColor && (
-              <span
-                aria-label={`Filtering ${filter} events`}
-                style={{
-                  ...styles.filterIndicator,
-                  background: activeFilterColor,
-                  boxShadow: `0 0 0 2px ${styles.header.background as string}`,
-                }}
-              />
+            {visible.length === 0 ? (
+              <div style={styles.empty}>No events yet. Run a query or mutation.</div>
+            ) : (
+              visible.map((event) => <EventRow key={event.id} e={event} showTimestamps={showTimestamps} />)
             )}
-          </button>
-          <button
-            onClick={handleClose}
-            style={styles.iconBtn}
-            className="convex-panel-btn convex-panel-icon-btn"
-            aria-label="Close Convex Inspect"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateRows: showSettings ? "1fr" : "0fr", transition: "grid-template-rows 200ms ease" }}>
-        <div style={{ overflow: "hidden" }}>
-          <div style={styles.settings} role="group" aria-label="Panel settings">
-            <SettingRow label="Show timestamps">
-              <Toggle checked={showTimestamps} onChange={toggleTimestamps} aria-label="Show timestamps" tabIndex={showSettings ? undefined : -1} />
-            </SettingRow>
-            <SettingRow label="Show count badge">
-              <Toggle checked={showBadge} onChange={toggleBadge} aria-label="Show count badge" tabIndex={showSettings ? undefined : -1} />
-            </SettingRow>
           </div>
         </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateRows: showFilters ? "1fr" : "0fr", transition: "grid-template-rows 200ms ease" }}>
-        <div style={{ overflow: "hidden" }}>
-          <div role="tablist" aria-label="Filter events" style={styles.filters}>
-            {(["all", "query", "mutation", "action"] as const).map((type) => (
-              <button
-                key={type}
-                role="tab"
-                aria-selected={filter === type}
-                onClick={() => {
-                  setFilter(type);
-                  try {
-                    localStorage.setItem(LS_FILTER, type);
-                  } catch {}
-                }}
-                className="convex-panel-btn"
-                tabIndex={showFilters ? undefined : -1}
-                style={{
-                  ...styles.filterBtn,
-                  ...(filter === type ? styles.filterBtnActive : {}),
-                  ...(type !== "all" ? { color: COLORS[type].text } : {}),
-                }}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div
-        ref={listRef}
-        role="log"
-        aria-label="Convex events"
-        aria-live="polite"
-        style={styles.list}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          atBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
-        }}
-      >
-        {visible.length === 0 ? (
-          <div style={styles.empty}>No events yet. Run a query or mutation.</div>
-        ) : (
-          visible.map((event) => <EventRow key={event.id} e={event} showTimestamps={showTimestamps} />)
-        )}
-      </div>
-    </div>
+      )}
+    </>,
+    portalRoot,
   );
 }
 
@@ -549,9 +615,13 @@ const styles: Record<string, CSSProperties> = {
     outline: "none",
     color: "#6c7086",
     cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     fontSize: 13,
     padding: "2px 6px",
     borderRadius: 4,
+    position: "relative",
   },
   filterIndicator: {
     position: "absolute",

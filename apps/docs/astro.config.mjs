@@ -1,11 +1,15 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import react from '@astrojs/react';
+import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
+  site: 'https://barrymichaeldoyle.github.io',
+  base: '/convex-inspect',
   integrations: [
     starlight({
       title: 'convex-inspect',
+      disable404Route: true,
       description:
         'Dev-time panel for inspecting Convex queries, mutations, and actions without leaving your app.',
       social: [
@@ -43,4 +47,16 @@ export default defineConfig({
     }),
     react(),
   ],
+  vite: {
+    resolve: {
+      alias: {
+        'convex-inspect/react': fileURLToPath(
+          new URL('../../packages/core/src/react.tsx', import.meta.url),
+        ),
+        'convex-inspect': fileURLToPath(
+          new URL('../../packages/core/src/index.ts', import.meta.url),
+        ),
+      },
+    },
+  },
 });

@@ -108,16 +108,29 @@ function DemoButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       style={{
+        appearance: 'none',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        height: '42px',
+        flex: '0 0 auto',
+        margin: 0,
+        verticalAlign: 'middle',
         padding: '8px 16px',
         borderRadius: '6px',
         border: `1px solid ${color}33`,
         background: `${color}15`,
         color,
         cursor: 'pointer',
+        fontFamily: 'inherit',
         fontSize: '0.875rem',
-        fontWeight: 600,
+        fontWeight: 700,
+        lineHeight: 1.2,
+        whiteSpace: 'nowrap',
       }}
     >
       {label}

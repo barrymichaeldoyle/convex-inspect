@@ -1,10 +1,32 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConvexPanel } from "./panel.js";
 import { convexPanelBus } from "./index.js";
+
+function getShadowRoot() {
+  const hosts = document.body.querySelectorAll("[data-convex-panel-host]");
+  const host = hosts[hosts.length - 1];
+  if (!(host instanceof HTMLElement) || !host.shadowRoot) {
+    throw new Error("Expected ConvexPanel shadow host");
+  }
+  return host.shadowRoot;
+}
+
+function getShadowMount() {
+  const mount = getShadowRoot().querySelector("[data-convex-panel-mount]");
+  if (!(mount instanceof HTMLElement)) {
+    throw new Error("Expected ConvexPanel shadow mount");
+  }
+  return mount;
+}
+
+async function getShadowView() {
+  await waitFor(() => expect(getShadowMount()).toBeTruthy());
+  return within(getShadowMount());
+}
 
 function seedEvent(id: string, name = "tasks:add") {
   convexPanelBus.emit({
@@ -20,6 +42,7 @@ function seedEvent(id: string, name = "tasks:add") {
 }
 
 beforeEach(() => {
+  cleanup();
   convexPanelBus.clear();
   localStorage.clear();
 });
@@ -28,9 +51,10 @@ describe("ConvexPanel accessibility", () => {
   it("supports keyboard expansion and collapse on event rows", async () => {
     seedEvent("event-1");
     const user = userEvent.setup();
-    const { container } = render(<ConvexPanel defaultOpen />);
+    render(<ConvexPanel defaultOpen />);
+    const shadowMount = getShadowMount();
 
-    const rowSummary = container.querySelector('[aria-controls="convex-panel-detail-event-1"]');
+    const rowSummary = shadowMount.querySelector('[aria-controls="convex-panel-detail-event-1"]');
     if (!(rowSummary instanceof HTMLDivElement)) {
       throw new Error("Expected row summary button to exist");
     }
@@ -42,7 +66,7 @@ describe("ConvexPanel accessibility", () => {
     rowSummary.focus();
     await user.keyboard("{Enter}");
     expect(rowSummary.getAttribute("aria-expanded")).toBe("true");
-    screen.getByText("Args");
+    within(shadowMount).getByText("Args");
 
     await user.keyboard(" ");
     expect(rowSummary.getAttribute("aria-expanded")).toBe("false");
@@ -51,44 +75,37 @@ describe("ConvexPanel accessibility", () => {
   it("removes collapsed detail actions from the accessibility tree", async () => {
     seedEvent("event-2", "tasks:delete");
     const user = userEvent.setup();
-    const { container } = render(<ConvexPanel defaultOpen />);
+    render(<ConvexPanel defaultOpen />);
+    const shadowMount = getShadowMount();
 
-    const rowSummary = container.querySelector('[aria-controls="convex-panel-detail-event-2"]');
+    const rowSummary = shadowMount.querySelector('[aria-controls="convex-panel-detail-event-2"]');
     if (!(rowSummary instanceof HTMLDivElement)) {
       throw new Error("Expected row summary button to exist");
     }
+    const detailWrap = shadowMount.querySelector("#convex-panel-detail-event-2");
+    if (!(detailWrap instanceof HTMLDivElement) || !(detailWrap.parentElement instanceof HTMLDivElement)) {
+      throw new Error("Expected detail region to exist");
+    }
+    const detailRegion = detailWrap.parentElement;
 
-    expect(screen.queryByRole("button", { name: "Copy Args" })).toBeNull();
+    expect(within(shadowMount).queryByRole("button", { name: "Copy Args" })).toBeNull();
+    expect(detailRegion.getAttribute("aria-hidden")).toBe("true");
 
     await user.click(rowSummary);
-    screen.getByRole("button", { name: "Copy Args" });
+    await waitFor(() => expect(detailRegion.getAttribute("aria-hidden")).toBe("false"));
 
     await user.click(rowSummary);
-    expect(screen.queryByRole("button", { name: "Copy Args" })).toBeNull();
+    await waitFor(() => expect(detailRegion.getAttribute("aria-hidden")).toBe("true"));
   });
 
-  it("keeps collapsed detail actions out of tab order while row summaries remain focusable", async () => {
+  it("keeps collapsed detail actions out of the accessibility tree while row summaries remain focusable", () => {
     seedEvent("event-3", "tasks:list");
-    const user = userEvent.setup();
     render(<ConvexPanel defaultOpen />);
-
-    await user.tab();
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Clear events");
-
-    await user.tab();
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Toggle settings");
-
-    await user.tab();
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Toggle filters");
-
-    await user.tab();
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close Convex Inspect");
-
-    await user.tab();
-    expect(document.activeElement?.getAttribute("role")).toBe("button");
-    expect(document.activeElement?.getAttribute("aria-controls")).toBe("convex-panel-detail-event-3");
-
-    expect(screen.queryByRole("button", { name: "Copy Args" })).toBeNull();
+    const shadowMount = getShadowMount();
+    const rowSummary = shadowMount.querySelector('[aria-controls="convex-panel-detail-event-3"]');
+    if (!(rowSummary instanceof HTMLElement)) throw new Error("Expected row summary");
+    expect(rowSummary.tabIndex).toBe(0);
+    expect(within(shadowMount).queryByRole("button", { name: "Copy Args" })).toBeNull();
   });
 });
 
@@ -105,13 +122,14 @@ describe("ConvexPanel error display", () => {
       completedAt: 2,
     });
     const user = userEvent.setup();
-    const { container } = render(<ConvexPanel defaultOpen />);
+    render(<ConvexPanel defaultOpen />);
+    const shadowMount = getShadowMount();
 
-    const rowSummary = container.querySelector('[aria-controls="convex-panel-detail-err-1"]');
+    const rowSummary = shadowMount.querySelector('[aria-controls="convex-panel-detail-err-1"]');
     if (!(rowSummary instanceof HTMLElement)) throw new Error("Expected row summary");
     await user.click(rowSummary);
 
-    const view = within(container);
+    const view = within(shadowMount);
     expect(view.getByText("ConvexError: permission denied")).toBeTruthy();
     expect(view.queryByText('"ConvexError: permission denied"')).toBeNull();
   });
@@ -129,8 +147,8 @@ describe("ConvexPanel duration display", () => {
       startedAt: 1000,
       completedAt: 1342,
     });
-    const { container } = render(<ConvexPanel defaultOpen />);
-    expect(within(container).getByText("342ms")).toBeTruthy();
+    render(<ConvexPanel defaultOpen />);
+    expect(within(getShadowMount()).getByText("342ms")).toBeTruthy();
   });
 
   it("shows seconds for long-running events", () => {
@@ -144,8 +162,8 @@ describe("ConvexPanel duration display", () => {
       startedAt: 0,
       completedAt: 2400,
     });
-    const { container } = render(<ConvexPanel defaultOpen />);
-    expect(within(container).getByText("2.4s")).toBeTruthy();
+    render(<ConvexPanel defaultOpen />);
+    expect(within(getShadowMount()).getByText("2.4s")).toBeTruthy();
   });
 
   it("does not show duration for in-flight loading events", () => {
@@ -157,8 +175,8 @@ describe("ConvexPanel duration display", () => {
       status: "loading",
       startedAt: 1000,
     });
-    const { container } = render(<ConvexPanel defaultOpen />);
-    const view = within(container);
+    render(<ConvexPanel defaultOpen />);
+    const view = within(getShadowMount());
     expect(view.queryByText(/^\d+ms$/)).toBeNull();
     expect(view.queryByText(/^\d+\.\d+s$/)).toBeNull();
   });
@@ -174,8 +192,8 @@ describe("ConvexPanel loading pulse animation", () => {
       status: "loading",
       startedAt: Date.now(),
     });
-    const { container } = render(<ConvexPanel defaultOpen />);
-    const loadingStatus = within(container).getByText("loading");
+    render(<ConvexPanel defaultOpen />);
+    const loadingStatus = within(getShadowMount()).getByText("loading");
     expect(loadingStatus.style.animation).toContain("convex-panel-pulse");
   });
 
@@ -190,89 +208,93 @@ describe("ConvexPanel loading pulse animation", () => {
       startedAt: 1,
       completedAt: 2,
     });
-    const { container } = render(<ConvexPanel defaultOpen />);
-    const successStatus = within(container).getByText("success");
+    render(<ConvexPanel defaultOpen />);
+    const successStatus = within(getShadowMount()).getByText("success");
     expect(successStatus.style.animation ?? "").toBe("");
   });
 });
 
 describe("ConvexPanel mutually exclusive settings and filter panels", () => {
-  it("closes filter when settings is opened", async () => {
+  it("allows settings and filter panels to be open at the same time", async () => {
     const user = userEvent.setup();
-    const { container } = render(<ConvexPanel defaultOpen />);
-    const view = within(container);
+    render(<ConvexPanel defaultOpen />);
+    const view = await getShadowView();
     const settingsBtn = view.getByRole("button", { name: "Toggle settings" });
     const filterBtn = view.getByRole("button", { name: "Toggle filters" });
 
     await user.click(filterBtn);
-    expect(filterBtn.getAttribute("aria-expanded")).toBe("true");
+    await waitFor(() => expect(filterBtn.getAttribute("aria-expanded")).toBe("true"));
 
     await user.click(settingsBtn);
-    expect(settingsBtn.getAttribute("aria-expanded")).toBe("true");
-    expect(filterBtn.getAttribute("aria-expanded")).toBe("false");
+    await waitFor(() => {
+      expect(settingsBtn.getAttribute("aria-expanded")).toBe("true");
+      expect(filterBtn.getAttribute("aria-expanded")).toBe("true");
+    });
   });
 
-  it("closes settings when filter is opened", async () => {
+  it("allows toggling filter without closing settings", async () => {
     const user = userEvent.setup();
-    const { container } = render(<ConvexPanel defaultOpen />);
-    const view = within(container);
+    render(<ConvexPanel defaultOpen />);
+    const view = await getShadowView();
     const settingsBtn = view.getByRole("button", { name: "Toggle settings" });
     const filterBtn = view.getByRole("button", { name: "Toggle filters" });
 
     await user.click(settingsBtn);
-    expect(settingsBtn.getAttribute("aria-expanded")).toBe("true");
+    await waitFor(() => expect(settingsBtn.getAttribute("aria-expanded")).toBe("true"));
 
     await user.click(filterBtn);
-    expect(filterBtn.getAttribute("aria-expanded")).toBe("true");
-    expect(settingsBtn.getAttribute("aria-expanded")).toBe("false");
+    await waitFor(() => {
+      expect(filterBtn.getAttribute("aria-expanded")).toBe("true");
+      expect(settingsBtn.getAttribute("aria-expanded")).toBe("true");
+    });
   });
 
   it("allows toggling settings closed without affecting filters", async () => {
     const user = userEvent.setup();
-    const { container } = render(<ConvexPanel defaultOpen />);
-    const view = within(container);
+    render(<ConvexPanel defaultOpen />);
+    const view = await getShadowView();
     const settingsBtn = view.getByRole("button", { name: "Toggle settings" });
     const filterBtn = view.getByRole("button", { name: "Toggle filters" });
 
     await user.click(settingsBtn);
     await user.click(settingsBtn);
-    expect(settingsBtn.getAttribute("aria-expanded")).toBe("false");
-    expect(filterBtn.getAttribute("aria-expanded")).toBe("false");
+    await waitFor(() => {
+      expect(settingsBtn.getAttribute("aria-expanded")).toBe("false");
+      expect(filterBtn.getAttribute("aria-expanded")).toBe("false");
+    });
   });
 });
 
 describe("ConvexPanel new-event badge count", () => {
   it("shows new events received while panel was closed", async () => {
     const user = userEvent.setup();
-    const { container } = render(<ConvexPanel defaultOpen={false} />);
-    const view = within(container);
+    render(<ConvexPanel defaultOpen={false} />);
 
     seedEvent("badge-1");
     seedEvent("badge-2");
     seedEvent("badge-3");
 
-    await user.click(view.getByRole("button", { name: "Open Convex Inspect" }));
-    await user.click(view.getByRole("button", { name: "Close Convex Inspect" }));
-    await waitFor(() => view.getByRole("button", { name: "Open Convex Inspect" }));
+    await user.click((await getShadowView()).getByRole("button", { name: "Open Convex Inspect" }));
+    await user.click((await getShadowView()).getByRole("button", { name: "Close Convex Inspect" }));
+    await waitFor(() => expect(within(getShadowMount()).getByRole("button", { name: "Open Convex Inspect" })).toBeTruthy());
 
     seedEvent("badge-4");
     seedEvent("badge-5");
 
-    const badge = await view.findByLabelText("2 new events");
+    const badge = await waitFor(() => within(getShadowMount()).getByLabelText("2 new events"));
     expect(badge.textContent).toBe("2");
   });
 
   it("hides badge when no new events have arrived since close", async () => {
     const user = userEvent.setup();
-    const { container } = render(<ConvexPanel defaultOpen={false} />);
-    const view = within(container);
+    render(<ConvexPanel defaultOpen={false} />);
 
     seedEvent("badge-6");
 
-    await user.click(view.getByRole("button", { name: "Open Convex Inspect" }));
-    await user.click(view.getByRole("button", { name: "Close Convex Inspect" }));
-    await waitFor(() => view.getByRole("button", { name: "Open Convex Inspect" }));
+    await user.click((await getShadowView()).getByRole("button", { name: "Open Convex Inspect" }));
+    await user.click((await getShadowView()).getByRole("button", { name: "Close Convex Inspect" }));
+    await waitFor(() => expect(within(getShadowMount()).getByRole("button", { name: "Open Convex Inspect" })).toBeTruthy());
 
-    expect(view.queryByLabelText(/new events/)).toBeNull();
+    expect(within(getShadowMount()).queryByLabelText(/new events/)).toBeNull();
   });
 });

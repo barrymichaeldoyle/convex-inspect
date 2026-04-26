@@ -1,5 +1,11 @@
 # convex-inspect
 
+## 0.2.1
+
+### Patch Changes
+
+- Render the Convex panel inside a Shadow DOM so host app styles do not leak into the UI.
+
 ## 0.2.0
 
 ### Minor Changes
