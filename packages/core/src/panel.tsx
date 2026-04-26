@@ -112,10 +112,10 @@ function formatTime(ts: number): string {
   return `${hh}:${mm}:${ss}.${ms}`;
 }
 
-const LS_TIMESTAMPS = "convex-panel:show-timestamps";
-const LS_BADGE = "convex-panel:show-badge";
-const LS_OPEN = "convex-panel:open";
-const LS_FILTER = "convex-panel:filter";
+const LS_TIMESTAMPS = "convex-inspect:show-timestamps";
+const LS_BADGE = "convex-inspect:show-badge";
+const LS_OPEN = "convex-inspect:open";
+const LS_FILTER = "convex-inspect:filter";
 
 function readPref(key: string, defaultVal = true): boolean {
   try {
@@ -191,7 +191,7 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
         onClick={handleOpen}
         style={styles.fab}
         className="convex-panel-root convex-panel-fab"
-        aria-label="Open Convex Panel"
+        aria-label="Open Convex Inspect"
         aria-haspopup="dialog"
       >
         <ConvexSymbol size={30} />
@@ -228,14 +228,14 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
   return (
     <div
       role="dialog"
-      aria-label="Convex Panel"
+      aria-label="Convex Inspect"
       className="convex-panel-root"
       style={{ ...styles.panel, animation: `${isClosing ? "convex-panel-out" : "convex-panel-in"} 180ms ease forwards` }}
     >
       <div style={styles.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ConvexSymbol size={20} />
-          <span style={styles.title}>Convex Panel</span>
+          <span style={styles.title}>Convex Inspect</span>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button
@@ -278,7 +278,7 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
             onClick={handleClose}
             style={styles.iconBtn}
             className="convex-panel-btn convex-panel-icon-btn"
-            aria-label="Close Convex Panel"
+            aria-label="Close Convex Inspect"
           >
             ✕
           </button>

@@ -1,4 +1,4 @@
-import { ConvexPanel, convexPanelBus, useQuery, useMutation, useAction } from "convex-panel/react";
+import { ConvexPanel, convexPanelBus, useQuery, useMutation, useAction } from "convex-inspect/react";
 
 let idCounter = 0;
 function nextId() {
@@ -64,7 +64,7 @@ function simulateQuery(name: string, args: unknown) {
 export function App() {
   return (
     <div style={{ fontFamily: "sans-serif", padding: 40, maxWidth: 520 }}>
-      <h1 style={{ marginBottom: 8, fontSize: 22, color: "#cdd6f4" }}>Convex Panel</h1>
+      <h1 style={{ marginBottom: 8, fontSize: 22, color: "#cdd6f4" }}>Convex Inspect</h1>
       <p style={{ color: "#6c7086", marginBottom: 32, fontSize: 14, lineHeight: 1.6 }}>
         Click the buttons below to simulate Convex events. Open the panel in the bottom-right corner.
       </p>

@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "convex-panel/react": fileURLToPath(new URL("../../packages/core/src/react.tsx", import.meta.url)),
-      "convex-panel$": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
+      "convex-inspect/react": fileURLToPath(new URL("../../packages/core/src/react.tsx", import.meta.url)),
+      "convex-inspect$": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
     },
   },
 });

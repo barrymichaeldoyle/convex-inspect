@@ -1,19 +1,19 @@
-# convex-panel
+# convex-inspect
 
 Devtools panel for Convex during development.
 
 ## Install
 
 ```bash
-pnpm add convex-panel
+pnpm add convex-inspect
 ```
 
-Docs: `https://barrymichaeldoyle.github.io/convex-panel/`
+Docs: `https://barrymichaeldoyle.github.io/convex-inspect/`
 
 ## React Usage
 
 ```tsx
-import { ConvexPanel, useAction, useMutation, useQuery } from "convex-panel/react";
+import { ConvexPanel, useAction, useMutation, useQuery } from "convex-inspect/react";
 ```
 
 Render the panel in your app:
@@ -22,7 +22,7 @@ Render the panel in your app:
 <ConvexPanel />
 ```
 
-`convex-panel/react` is intended for development use. The panel UI does not render in production.
+`convex-inspect/react` is intended for development use. The panel UI does not render in production.
 
 ## Package
 

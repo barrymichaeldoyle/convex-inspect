@@ -1,5 +1,5 @@
 {
-  "name": "@convex-panel/docs",
+  "name": "@convex-inspect/docs",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "convex": "^1.0.0",
-    "convex-panel": "workspace:*",
+    "convex-inspect": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

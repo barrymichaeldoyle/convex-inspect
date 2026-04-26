@@ -1,4 +1,4 @@
-import { ConvexPanel, convexPanelBus } from "convex-panel/react";
+import { ConvexPanel, convexPanelBus } from "convex-inspect/react";
 
 let idCounter = 0;
 function nextId() {
@@ -38,8 +38,8 @@ function triggerAction() {
   emitEvent("action", "email:send", { to: "user@example.com" }, 720 + Math.random() * 820);
 }
 
-const codeInstall = `pnpm add convex-panel`;
-const codeImport = `import { ConvexPanel, useQuery, useMutation, useAction } from "convex-panel/react";`;
+const codeInstall = `pnpm add convex-inspect`;
+const codeImport = `import { ConvexPanel, useQuery, useMutation, useAction } from "convex-inspect/react";`;
 const codeRender = `<ConvexPanel />`;
 
 export function App() {
@@ -51,11 +51,11 @@ export function App() {
             <p className="eyebrow">Convex Devtools</p>
             <h1>Inspect queries, mutations, and actions without leaving your app.</h1>
             <p className="lede">
-              `convex-panel` gives you a compact in-app event log with keyboard-accessible rows, JSON inspection, and quick copy
+              `convex-inspect` gives you a compact in-app event log with keyboard-accessible rows, JSON inspection, and quick copy
               controls for debugging Convex flows during development.
             </p>
             <div className="hero-actions">
-              <a className="primary-link" href="https://github.com/barrymichaeldoyle/convex-panel" target="_blank" rel="noreferrer">
+              <a className="primary-link" href="https://github.com/barrymichaeldoyle/convex-inspect" target="_blank" rel="noreferrer">
                 View on GitHub
               </a>
               <span className="status-pill">npm name currently unavailable</span>

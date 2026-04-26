@@ -82,7 +82,7 @@ describe("ConvexPanel accessibility", () => {
     expect(document.activeElement?.getAttribute("aria-label")).toBe("Toggle filters");
 
     await user.tab();
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close Convex Panel");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close Convex Inspect");
 
     await user.tab();
     expect(document.activeElement?.getAttribute("role")).toBe("button");

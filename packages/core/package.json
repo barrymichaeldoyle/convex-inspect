@@ -1,16 +1,16 @@
 {
-  "name": "convex-panel",
+  "name": "convex-inspect",
   "version": "0.1.0",
   "description": "Devtools panel for Convex — inspect queries, mutations, and actions during development",
   "keywords": ["convex", "devtools", "panel", "react"],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/barrymichaeldoyle/convex-panel.git"
+    "url": "git+https://github.com/barrymichaeldoyle/convex-inspect.git"
   },
-  "homepage": "https://barrymichaeldoyle.github.io/convex-panel/",
+  "homepage": "https://barrymichaeldoyle.github.io/convex-inspect/",
   "bugs": {
-    "url": "https://github.com/barrymichaeldoyle/convex-panel/issues"
+    "url": "https://github.com/barrymichaeldoyle/convex-inspect/issues"
   },
   "type": "module",
   "main": "./dist/index.cjs",

@@ -1,8 +1,8 @@
-# convex-panel
+# convex-inspect
 
 Development panel for Convex apps.
 
-Docs: `https://barrymichaeldoyle.github.io/convex-panel/`
+Docs: `https://barrymichaeldoyle.github.io/convex-inspect/`
 
 ## Workspace
 
@@ -30,4 +30,4 @@ pnpm release
 
 ## Package Name
 
-The source package name is `convex-panel`, but npm publication is currently blocked until that npm package name becomes available or is transferred.
+The package name is `convex-inspect`.
