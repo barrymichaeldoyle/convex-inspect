@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConvexPanel } from "./panel.js";
 import { convexPanelBus } from "./index.js";
@@ -132,6 +132,77 @@ describe("ConvexPanel error display", () => {
     const view = within(shadowMount);
     expect(view.getByText("ConvexError: permission denied")).toBeTruthy();
     expect(view.queryByText('"ConvexError: permission denied"')).toBeNull();
+  });
+
+  it("renders structured error data and a hidden stack trace toggle", async () => {
+    convexPanelBus.emit({
+      id: "err-2",
+      type: "mutation",
+      name: "tasks:add",
+      args: { text: "Buy milk" },
+      status: "error",
+      error: "permission denied",
+      errorData: { field: "userId" },
+      errorStack: "Error: permission denied\n    at handler (handler.ts:1:1)",
+      startedAt: 1,
+      completedAt: 2,
+    });
+    const user = userEvent.setup();
+    render(<ConvexPanel defaultOpen />);
+    const shadowMount = getShadowMount();
+
+    const rowSummary = shadowMount.querySelector('[aria-controls="convex-panel-detail-err-2"]');
+    if (!(rowSummary instanceof HTMLElement)) throw new Error("Expected row summary");
+    await user.click(rowSummary);
+
+    const view = within(shadowMount);
+    expect(view.getByText("permission denied")).toBeTruthy();
+    expect(view.getByText("Error data")).toBeTruthy();
+
+    expect(view.queryByText(/at handler/)).toBeNull();
+    await user.click(view.getByRole("button", { name: "Show stack trace" }));
+    await waitFor(() => expect(within(shadowMount).getByText(/at handler/)).toBeTruthy());
+  });
+});
+
+describe("ConvexPanel search", () => {
+  it("filters events by name substring", async () => {
+    convexPanelBus.emit({ id: "s-1", type: "query", name: "tasks:list", args: {}, status: "success", result: [], startedAt: 1, completedAt: 2 });
+    convexPanelBus.emit({ id: "s-2", type: "query", name: "users:get", args: {}, status: "success", result: {}, startedAt: 1, completedAt: 2 });
+    render(<ConvexPanel defaultOpen />);
+    const view = await getShadowView();
+
+    expect(view.getByText("tasks:list")).toBeTruthy();
+    expect(view.getByText("users:get")).toBeTruthy();
+
+    const search = view.getByLabelText("Search events by name") as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "tasks" } });
+    await waitFor(() => {
+      expect(within(getShadowMount()).queryByText("users:get")).toBeNull();
+      expect(within(getShadowMount()).getByText("tasks:list")).toBeTruthy();
+    });
+  });
+
+  it("shows a friendlier empty state when nothing matches the search", async () => {
+    convexPanelBus.emit({ id: "s-3", type: "query", name: "tasks:list", args: {}, status: "success", result: [], startedAt: 1, completedAt: 2 });
+    render(<ConvexPanel defaultOpen />);
+    const view = await getShadowView();
+
+    const search = view.getByLabelText("Search events by name") as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "nonexistent" } });
+    await waitFor(() => expect(within(getShadowMount()).getByText("No events match your filters.")).toBeTruthy());
+  });
+});
+
+describe("ConvexPanel grouping", () => {
+  it("renders a count badge when consecutive identical calls are grouped", () => {
+    const base = { type: "mutation" as const, name: "tasks:add", args: { text: "Buy milk" } };
+    convexPanelBus.emit({ id: "g-1", ...base, status: "success", result: { ok: true }, startedAt: 1, completedAt: 2 });
+    convexPanelBus.emit({ id: "g-2", ...base, status: "success", result: { ok: true }, startedAt: 3, completedAt: 4 });
+    convexPanelBus.emit({ id: "g-3", ...base, status: "success", result: { ok: true }, startedAt: 5, completedAt: 6 });
+
+    render(<ConvexPanel defaultOpen />);
+    expect(within(getShadowMount()).getByLabelText("3 occurrences").textContent).toBe("×3");
   });
 });
 

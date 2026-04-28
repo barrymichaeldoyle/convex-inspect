@@ -1,6 +1,6 @@
 {
   "name": "convex-inspect",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Devtools panel for Convex — inspect queries, mutations, and actions during development",
   "keywords": [
     "convex",

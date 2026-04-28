@@ -80,6 +80,18 @@ const PANEL_CSS = `
   .convex-panel-filter-btn:hover[aria-selected="false"] {
     border-color: currentColor !important;
   }
+  .convex-panel-search-input::placeholder {
+    color: #6c7086;
+  }
+  .convex-panel-search-input:focus,
+  .convex-panel-search-input:focus-visible {
+    border-color: #585b70 !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  .convex-panel-search-input::-webkit-search-cancel-button {
+    display: none;
+  }
   .convex-panel-row-summary {
     transition: background 150ms ease;
   }
@@ -165,6 +177,12 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function totalOccurrences(events: ConvexEvent[]): number {
+  let total = 0;
+  for (const e of events) total += e.count ?? 1;
+  return total;
+}
+
 const LS_TIMESTAMPS = "convex-inspect:show-timestamps";
 const LS_BADGE = "convex-inspect:show-badge";
 const LS_OPEN = "convex-inspect:open";
@@ -203,6 +221,7 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
   const [showTimestamps, setShowTimestamps] = useState(() => readPref(LS_TIMESTAMPS));
   const [showBadge, setShowBadge] = useState(() => readPref(LS_BADGE));
   const [seenCount, setSeenCount] = useState(0);
+  const [search, setSearch] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
 
@@ -231,7 +250,7 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
 
   function handleClose() {
     setIsClosing(true);
-    setSeenCount(events.length);
+    setSeenCount(totalOccurrences(events));
     writePref(LS_OPEN, false);
     setTimeout(() => {
       setOpen(false);
@@ -241,7 +260,12 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
 
   useEffect(() => convexPanelBus.subscribe(setEvents), []);
 
-  const visible = filter === "all" ? events : events.filter((event) => event.type === filter);
+  const searchTrimmed = search.trim().toLowerCase();
+  const visible = events.filter((event) => {
+    if (filter !== "all" && event.type !== filter) return false;
+    if (searchTrimmed && !event.name.toLowerCase().includes(searchTrimmed)) return false;
+    return true;
+  });
   const activeFilterColor = filter === "all" ? null : COLORS[filter].text;
 
   useEffect(() => {
@@ -274,31 +298,35 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
           aria-haspopup="dialog"
         >
           <ConvexSymbol size={30} />
-          {showBadge && events.length - seenCount > 0 && (
-            <span
-              aria-label={`${events.length - seenCount} new events`}
-              style={{
-                position: "absolute",
-                top: -3,
-                right: -3,
-                background: "#89b4fa",
-                color: "#1e1e2e",
-                borderRadius: 10,
-                fontSize: 9,
-                fontWeight: 700,
-                padding: "0 4px",
-                minWidth: 16,
-                height: 16,
-                textAlign: "center",
-                lineHeight: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {events.length - seenCount}
-            </span>
-          )}
+          {(() => {
+            const newCount = totalOccurrences(events) - seenCount;
+            if (!showBadge || newCount <= 0) return null;
+            return (
+              <span
+                aria-label={`${newCount} new events`}
+                style={{
+                  position: "absolute",
+                  top: -3,
+                  right: -3,
+                  background: "#89b4fa",
+                  color: "#1e1e2e",
+                  borderRadius: 10,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: "0 4px",
+                  minWidth: 16,
+                  height: 16,
+                  textAlign: "center",
+                  lineHeight: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {newCount}
+              </span>
+            );
+          })()}
         </button>
       ) : (
         <div
@@ -418,6 +446,29 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
             </div>
           </div>
 
+          <div style={styles.searchBar}>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name…"
+              aria-label="Search events by name"
+              style={styles.searchInput}
+              className="convex-panel-search-input"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                className="convex-panel-btn convex-panel-icon-btn"
+                style={styles.searchClear}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           <div
             ref={listRef}
             role="log"
@@ -430,7 +481,11 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
             }}
           >
             {visible.length === 0 ? (
-              <div style={styles.empty}>No events yet. Run a query or mutation.</div>
+              <div style={styles.empty}>
+                {events.length === 0
+                  ? "No events yet. Run a query or mutation."
+                  : "No events match your filters."}
+              </div>
             ) : (
               visible.map((event) => <EventRow key={event.id} e={event} showTimestamps={showTimestamps} />)
             )}
@@ -521,10 +576,13 @@ function EventRow({ e, showTimestamps }: { e: ConvexEvent; showTimestamps: boole
         aria-controls={detailId}
       >
         <span style={{ ...styles.badge, background: COLORS[e.type].bg, color: COLORS[e.type].text }}>{e.type}</span>
-        <span style={{ color: "#cdd6f4", fontWeight: 600 }}>{e.name}</span>
+        <span style={styles.rowName} title={e.name}>{e.name}</span>
         <span style={{ color: STATUS_COLORS[e.status], fontSize: 11, ...(e.status === "loading" ? { animation: "convex-panel-pulse 1.5s ease-in-out infinite" } : {}) }}>{e.status}</span>
         {e.completedAt !== undefined && (
           <span style={{ color: "#a6adc8", fontSize: 11 }}>{formatDuration(e.completedAt - e.startedAt)}</span>
+        )}
+        {e.count && e.count > 1 && (
+          <span style={styles.countBadge} aria-label={`${e.count} occurrences`}>×{e.count}</span>
         )}
         {showTimestamps && <span style={{ color: "#6c7086", marginLeft: "auto" }}>{formatTime(e.completedAt ?? e.startedAt)}</span>}
       </div>
@@ -536,10 +594,39 @@ function EventRow({ e, showTimestamps }: { e: ConvexEvent; showTimestamps: boole
           <div id={detailId} style={styles.detailWrap} data-convex-panel-detail="true">
             <JsonBlock label="Args" value={e.args} />
             {"result" in e && e.result !== undefined && <JsonBlock label="Result" value={e.result} />}
-            {"error" in e && e.error && <JsonBlock label="Error" value={e.error} />}
+            {e.status === "error" && e.error && (
+              <ErrorBlock message={e.error} data={e.errorData} stack={e.errorStack} />
+            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ErrorBlock({ message, data, stack }: { message: string; data?: unknown; stack?: string }) {
+  const [showStack, setShowStack] = useState(false);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={styles.detailLabel}>Error</div>
+      <div style={styles.errorMessage} role="alert">{message}</div>
+      {data !== undefined && <JsonBlock label="Error data" value={data} />}
+      {stack && (
+        <div style={{ marginTop: 6 }}>
+          <button
+            type="button"
+            onClick={() => setShowStack((v) => !v)}
+            className="convex-panel-btn convex-panel-icon-btn"
+            aria-expanded={showStack}
+            style={styles.stackToggle}
+          >
+            {showStack ? "Hide stack trace" : "Show stack trace"}
+          </button>
+          {showStack && (
+            <pre style={{ ...styles.pre, marginTop: 4, color: "#bac2de" }}>{stack}</pre>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -687,6 +774,34 @@ const styles: Record<string, CSSProperties> = {
     flex: 1,
     minHeight: 0,
   },
+  searchBar: {
+    position: "relative",
+    padding: "8px 14px",
+    borderBottom: "1px solid #313244",
+    background: "#181825",
+  },
+  searchInput: {
+    width: "100%",
+    background: "#11111b",
+    border: "1px solid #313244",
+    borderRadius: 6,
+    color: "#cdd6f4",
+    fontSize: 12,
+    padding: "5px 28px 5px 8px",
+    outline: "none",
+  },
+  searchClear: {
+    position: "absolute",
+    top: "50%",
+    right: 18,
+    transform: "translateY(-50%)",
+    color: "#6c7086",
+    fontSize: 11,
+    padding: "2px 4px",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+  },
   settings: {
     padding: "10px 14px",
     borderBottom: "1px solid #313244",
@@ -715,6 +830,25 @@ const styles: Record<string, CSSProperties> = {
     padding: "8px 14px",
     lineHeight: "16px",
     minHeight: 32,
+  },
+  rowName: {
+    color: "#cdd6f4",
+    fontWeight: 600,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  countBadge: {
+    background: "rgba(137, 180, 250, 0.15)",
+    color: "#89b4fa",
+    border: "1px solid rgba(137, 180, 250, 0.35)",
+    borderRadius: 10,
+    fontSize: 10,
+    fontWeight: 700,
+    padding: "0 6px",
+    lineHeight: "14px",
   },
   detailWrap: {
     padding: "8px 14px 12px",
@@ -759,5 +893,25 @@ const styles: Record<string, CSSProperties> = {
     padding: "2px 6px",
     cursor: "pointer",
     zIndex: 1,
+  },
+  errorMessage: {
+    background: "rgba(243, 139, 168, 0.08)",
+    border: "1px solid rgba(243, 139, 168, 0.3)",
+    borderRadius: 8,
+    padding: "8px 10px",
+    color: "#f38ba8",
+    fontSize: 12,
+    fontWeight: 600,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  },
+  stackToggle: {
+    background: "none",
+    border: "none",
+    color: "#6c7086",
+    fontSize: 11,
+    padding: "2px 6px",
+    cursor: "pointer",
+    borderRadius: 4,
   },
 };

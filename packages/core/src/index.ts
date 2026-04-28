@@ -12,11 +12,23 @@ export interface ConvexEvent {
   status: ConvexEventStatus;
   result?: unknown;
   error?: string;
+  errorData?: unknown;
+  errorStack?: string;
   startedAt: number;
   completedAt?: number;
+  count?: number;
 }
 
 type Listener = (events: ConvexEvent[]) => void;
+
+function sameLogicalCall(a: ConvexEvent, b: ConvexEvent): boolean {
+  if (a.type !== b.type || a.name !== b.name || a.status !== b.status) return false;
+  try {
+    return JSON.stringify(a.args ?? null) === JSON.stringify(b.args ?? null);
+  } catch {
+    return false;
+  }
+}
 
 class ConvexPanelBus {
   private events: ConvexEvent[] = [];
@@ -24,11 +36,31 @@ class ConvexPanelBus {
 
   emit(event: ConvexEvent) {
     const idx = this.events.findIndex((e) => e.id === event.id);
+    let next: ConvexEvent[];
     if (idx >= 0) {
-      this.events = this.events.map((e, i) => (i === idx ? event : e));
+      next = this.events.map((e, i) => (i === idx ? event : e));
     } else {
-      this.events = [...this.events, event].slice(-200);
+      next = [...this.events, event].slice(-200);
     }
+
+    if (event.status === "success" || event.status === "error") {
+      const lastIdx = next.length - 1;
+      const isLast = (idx >= 0 ? idx : lastIdx) === lastIdx;
+      if (isLast && lastIdx > 0) {
+        const prev = next[lastIdx - 1];
+        const curr = next[lastIdx];
+        if (prev && curr && sameLogicalCall(prev, curr)) {
+          const merged: ConvexEvent = {
+            ...curr,
+            count: (prev.count ?? 1) + 1,
+            startedAt: prev.startedAt,
+          };
+          next = [...next.slice(0, lastIdx - 1), merged];
+        }
+      }
+    }
+
+    this.events = next;
     for (const l of this.listeners) l(this.events);
   }
 
@@ -61,6 +93,24 @@ export function getFnName(ref: unknown): string {
   return "unknown";
 }
 
+export interface ExtractedError {
+  error: string;
+  errorData?: unknown;
+  errorStack?: string;
+}
+
+export function extractError(err: unknown): ExtractedError {
+  if (err instanceof Error) {
+    const data = (err as { data?: unknown }).data;
+    return {
+      error: err.message || err.name || "Error",
+      errorStack: err.stack,
+      ...(data !== undefined ? { errorData: data } : {}),
+    };
+  }
+  return { error: String(err) };
+}
+
 export function createConvexDevClient<T extends object>(client: T): T {
   return new Proxy(client, {
     get(target, prop) {
@@ -80,7 +130,7 @@ export function createConvexDevClient<T extends object>(client: T): T {
           promise.then((result) => {
             convexPanelBus.emit({ id, type, name, args, status: "success", result, startedAt, completedAt: Date.now() });
           }).catch((err: unknown) => {
-            convexPanelBus.emit({ id, type, name, args, status: "error", error: String(err), startedAt, completedAt: Date.now() });
+            convexPanelBus.emit({ id, type, name, args, status: "error", ...extractError(err), startedAt, completedAt: Date.now() });
           });
           return promise;
         };
