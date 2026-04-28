@@ -64,6 +64,28 @@ function sameLogicalCall(a: ConvexEvent, b: ConvexEvent): boolean {
   return true;
 }
 
+function consolidate(events: ConvexEvent[]): ConvexEvent[] {
+  const out: ConvexEvent[] = [];
+  for (const event of events) {
+    const last = out[out.length - 1];
+    if (
+      last &&
+      (event.status === "success" || event.status === "error") &&
+      sameLogicalCall(last, event)
+    ) {
+      out[out.length - 1] = {
+        ...event,
+        id: last.id,
+        count: (last.count ?? 1) + 1,
+        startedAt: last.startedAt,
+      };
+    } else {
+      out.push(event);
+    }
+  }
+  return out;
+}
+
 class ConvexPanelBus {
   private events: ConvexEvent[] = [];
   private listeners = new Set<Listener>();
@@ -76,25 +98,7 @@ class ConvexPanelBus {
     } else {
       next = [...this.events, event].slice(-200);
     }
-
-    if (event.status === "success" || event.status === "error") {
-      const lastIdx = next.length - 1;
-      const isLast = (idx >= 0 ? idx : lastIdx) === lastIdx;
-      if (isLast && lastIdx > 0) {
-        const prev = next[lastIdx - 1];
-        const curr = next[lastIdx];
-        if (prev && curr && sameLogicalCall(prev, curr)) {
-          const merged: ConvexEvent = {
-            ...curr,
-            count: (prev.count ?? 1) + 1,
-            startedAt: prev.startedAt,
-          };
-          next = [...next.slice(0, lastIdx - 1), merged];
-        }
-      }
-    }
-
-    this.events = next;
+    this.events = consolidate(next);
     for (const l of this.listeners) l(this.events);
   }
 

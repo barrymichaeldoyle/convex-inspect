@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { convexPanelBus, type ConvexEvent, type ConvexEventType } from "./index.js";
 
@@ -187,6 +187,8 @@ const LS_TIMESTAMPS = "convex-inspect:show-timestamps";
 const LS_BADGE = "convex-inspect:show-badge";
 const LS_OPEN = "convex-inspect:open";
 const LS_FILTER = "convex-inspect:filter";
+const DETAIL_EXPAND_MS = 180;
+const DETAIL_EXPAND_TRANSITION = `grid-template-rows ${DETAIL_EXPAND_MS}ms ease`;
 
 function readPref(key: string, defaultVal = true): boolean {
   try {
@@ -487,7 +489,7 @@ export function ConvexPanel({ defaultOpen = false }: ConvexPanelProps) {
                   : "No events match your filters."}
               </div>
             ) : (
-              visible.map((event) => <EventRow key={event.id} e={event} showTimestamps={showTimestamps} />)
+              visible.map((event) => <EventRow key={event.id} e={event} showTimestamps={showTimestamps} listRef={listRef} />)
             )}
           </div>
         </div>
@@ -543,9 +545,56 @@ function Toggle(
   );
 }
 
-function EventRow({ e, showTimestamps }: { e: ConvexEvent; showTimestamps: boolean }) {
+function EventRow({
+  e,
+  showTimestamps,
+  listRef,
+}: {
+  e: ConvexEvent;
+  showTimestamps: boolean;
+  listRef: RefObject<HTMLDivElement | null>;
+}) {
   const [open, setOpen] = useState(false);
   const detailId = `convex-panel-detail-${e.id}`;
+  const detailWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function ensureDetailVisible() {
+      const listEl = listRef.current;
+      const detailEl = detailWrapRef.current;
+      if (!listEl || !detailEl) return;
+
+      const listRect = listEl.getBoundingClientRect();
+      const detailRect = detailEl.getBoundingClientRect();
+      const padding = 8;
+
+      if (detailRect.bottom > listRect.bottom - padding) {
+        listEl.scrollTop += detailRect.bottom - listRect.bottom + padding;
+        return;
+      }
+
+      if (detailRect.top < listRect.top + padding) {
+        listEl.scrollTop += detailRect.top - listRect.top - padding;
+      }
+    }
+
+    const startedAt = performance.now();
+    let rafId = 0;
+
+    function syncScroll(now: number) {
+      ensureDetailVisible();
+      if (now - startedAt < DETAIL_EXPAND_MS + 32) {
+        rafId = requestAnimationFrame(syncScroll);
+      }
+    }
+
+    rafId = requestAnimationFrame(syncScroll);
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, [listRef, open]);
 
   function handleRowClick(event: ReactMouseEvent<HTMLDivElement>) {
     const selection = typeof window !== "undefined" ? window.getSelection()?.toString() : "";
@@ -591,7 +640,7 @@ function EventRow({ e, showTimestamps }: { e: ConvexEvent; showTimestamps: boole
           style={{ ...styles.detailRegionInner, visibility: open ? "visible" : "hidden" }}
           aria-hidden={!open}
         >
-          <div id={detailId} style={styles.detailWrap} data-convex-panel-detail="true">
+          <div ref={detailWrapRef} id={detailId} style={styles.detailWrap} data-convex-panel-detail="true">
             <JsonBlock label="Args" value={e.args} />
             {"result" in e && e.result !== undefined && <JsonBlock label="Result" value={e.result} />}
             {e.status === "error" && e.error && (
@@ -857,7 +906,7 @@ const styles: Record<string, CSSProperties> = {
   detailRegion: {
     display: "grid",
     gridTemplateRows: "0fr",
-    transition: "grid-template-rows 180ms ease",
+    transition: DETAIL_EXPAND_TRANSITION,
   },
   detailRegionInner: {
     overflow: "hidden",

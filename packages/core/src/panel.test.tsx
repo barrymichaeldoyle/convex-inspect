@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConvexPanel } from "./panel.js";
@@ -106,6 +106,32 @@ describe("ConvexPanel accessibility", () => {
     if (!(rowSummary instanceof HTMLElement)) throw new Error("Expected row summary");
     expect(rowSummary.tabIndex).toBe(0);
     expect(within(shadowMount).queryByRole("button", { name: "Copy Args" })).toBeNull();
+  });
+
+  it("scrolls expanded bottom-row details into view", async () => {
+    seedEvent("event-4", "tasks:first");
+    seedEvent("event-5", "tasks:second");
+    const user = userEvent.setup();
+    render(<ConvexPanel defaultOpen />);
+    const shadowMount = getShadowMount();
+
+    const list = within(shadowMount).getByRole("log", { name: "Convex events" }) as HTMLDivElement;
+    const rowSummary = shadowMount.querySelector('[aria-controls="convex-panel-detail-event-5"]');
+    const detailWrap = shadowMount.querySelector("#convex-panel-detail-event-5");
+    if (!(rowSummary instanceof HTMLDivElement) || !(detailWrap instanceof HTMLDivElement)) {
+      throw new Error("Expected bottom row and detail region to exist");
+    }
+
+    vi.spyOn(list, "getBoundingClientRect").mockImplementation(
+      () => ({ top: 0, bottom: 120, left: 0, right: 320, width: 320, height: 120, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect,
+    );
+    vi.spyOn(detailWrap, "getBoundingClientRect").mockImplementation(
+      () => ({ top: 72, bottom: 180, left: 0, right: 320, width: 320, height: 108, x: 0, y: 72, toJSON: () => ({}) }) as DOMRect,
+    );
+    expect(list.scrollTop).toBe(0);
+    await user.click(rowSummary);
+
+    await waitFor(() => expect(list.scrollTop).toBeGreaterThan(0));
   });
 });
 
