@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useAction as convexUseAction, useMutation as convexUseMutation, useQuery as convexUseQuery } from "convex/react";
 import type { FunctionReference, FunctionReturnType, OptionalRestArgs } from "convex/server";
 import { isDevEnvironment } from "./env.js";
-import { convexPanelBus, createEventId, getFnName } from "./index.js";
+import { convexPanelBus, createEventId, extractError, getFnName } from "./index.js";
 
 function serializeArgs(args: unknown) {
   try {
@@ -65,7 +65,7 @@ export function useMutation<Mutation extends FunctionReference<"mutation">>(muta
         convexPanelBus.emit({ id, type: "mutation", name, args: args[0] ?? {}, status: "success", result, startedAt, completedAt: Date.now() });
         return result;
       } catch (err) {
-        convexPanelBus.emit({ id, type: "mutation", name, args: args[0] ?? {}, status: "error", error: String(err), startedAt, completedAt: Date.now() });
+        convexPanelBus.emit({ id, type: "mutation", name, args: args[0] ?? {}, status: "error", ...extractError(err), startedAt, completedAt: Date.now() });
         throw err;
       }
     },
@@ -89,7 +89,7 @@ export function useAction<Action extends FunctionReference<"action">>(action: Ac
         convexPanelBus.emit({ id, type: "action", name, args: args[0] ?? {}, status: "success", result, startedAt, completedAt: Date.now() });
         return result;
       } catch (err) {
-        convexPanelBus.emit({ id, type: "action", name, args: args[0] ?? {}, status: "error", error: String(err), startedAt, completedAt: Date.now() });
+        convexPanelBus.emit({ id, type: "action", name, args: args[0] ?? {}, status: "error", ...extractError(err), startedAt, completedAt: Date.now() });
         throw err;
       }
     },

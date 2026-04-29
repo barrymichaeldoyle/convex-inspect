@@ -1,5 +1,14 @@
 # convex-inspect
 
+## 0.3.0
+
+### Minor Changes
+
+- Add three features to make the panel actually useful for debugging:
+  - **Search**: a search input above the event list filters rows by function name (case-insensitive substring). Combines with the existing type filter.
+  - **Structured error rendering**: errors thrown from mutations and actions now capture the message, optional `data` (for `ConvexError`s), and the stack trace. The panel renders the message prominently in red, shows `data` as JSON, and hides the stack behind a toggle.
+  - **Group consecutive identical calls**: when the same function is invoked back-to-back with the same args and the same terminal status, the rows are merged into a single row with an `×N` count badge. The unread-count badge on the closed FAB now sums occurrences instead of distinct rows, so it still reflects "how many calls happened" even when grouping is active.
+
 ## 0.2.2
 
 ### Patch Changes

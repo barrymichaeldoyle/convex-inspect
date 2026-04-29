@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { convexPanelBus, createConvexDevClient } from "./index.js";
+import { convexPanelBus, createConvexDevClient, extractError } from "./index.js";
 
 beforeEach(() => convexPanelBus.clear());
 afterEach(() => {
@@ -44,7 +44,7 @@ describe("convexPanelBus", () => {
 
   it("caps at 200 events, keeping newest", () => {
     for (let i = 0; i < 210; i++) {
-      convexPanelBus.emit({ id: String(i), type: "mutation", name: "fn", args: {}, status: "success", startedAt: 0 });
+      convexPanelBus.emit({ id: String(i), type: "mutation", name: `fn-${i}`, args: {}, status: "success", startedAt: 0 });
     }
     const events = convexPanelBus.getEvents();
     expect(events).toHaveLength(200);
@@ -55,6 +55,88 @@ describe("convexPanelBus", () => {
     convexPanelBus.emit({ id: "x", type: "action", name: "fn", args: {}, status: "success", startedAt: 0 });
     convexPanelBus.clear();
     expect(convexPanelBus.getEvents()).toHaveLength(0);
+  });
+
+  it("groups consecutive identical terminal events into a single row with count", () => {
+    const base = { type: "mutation" as const, name: "tasks:add", args: { text: "hi" } };
+    convexPanelBus.emit({ id: "a", ...base, status: "loading", startedAt: 1 });
+    convexPanelBus.emit({ id: "a", ...base, status: "success", startedAt: 1, completedAt: 2 });
+    convexPanelBus.emit({ id: "b", ...base, status: "loading", startedAt: 3 });
+    convexPanelBus.emit({ id: "b", ...base, status: "success", startedAt: 3, completedAt: 4 });
+    convexPanelBus.emit({ id: "c", ...base, status: "loading", startedAt: 5 });
+    convexPanelBus.emit({ id: "c", ...base, status: "success", startedAt: 5, completedAt: 6 });
+
+    const events = convexPanelBus.getEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].count).toBe(3);
+    expect(events[0].startedAt).toBe(1);
+    expect(events[0].completedAt).toBe(6);
+  });
+
+  it("does not group when args differ", () => {
+    const base = { type: "mutation" as const, name: "tasks:add" };
+    convexPanelBus.emit({ id: "a", ...base, args: { text: "x" }, status: "success", startedAt: 1 });
+    convexPanelBus.emit({ id: "b", ...base, args: { text: "y" }, status: "success", startedAt: 2 });
+    expect(convexPanelBus.getEvents()).toHaveLength(2);
+  });
+
+  it("groups when args are structurally equal but object keys were inserted in a different order", () => {
+    const base = { type: "mutation" as const, name: "tasks:add", status: "success" as const };
+    convexPanelBus.emit({ id: "a", ...base, args: { text: "hi", done: false }, result: { ok: true }, startedAt: 1, completedAt: 2 });
+    convexPanelBus.emit({ id: "b", ...base, args: { done: false, text: "hi" }, result: { ok: true }, startedAt: 3, completedAt: 4 });
+
+    const events = convexPanelBus.getEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].count).toBe(2);
+  });
+
+  it("does not group while a call is still loading", () => {
+    const base = { type: "mutation" as const, name: "tasks:add", args: { text: "hi" } };
+    convexPanelBus.emit({ id: "a", ...base, status: "success", startedAt: 1, completedAt: 2 });
+    convexPanelBus.emit({ id: "b", ...base, status: "loading", startedAt: 3 });
+    expect(convexPanelBus.getEvents()).toHaveLength(2);
+  });
+
+  it("does not group successful calls when the results differ", () => {
+    const base = { type: "query" as const, name: "tasks:list", args: { list: "all" }, status: "success" as const };
+    convexPanelBus.emit({ id: "a", ...base, result: ["a"], startedAt: 1, completedAt: 2 });
+    convexPanelBus.emit({ id: "b", ...base, result: ["b"], startedAt: 3, completedAt: 4 });
+    expect(convexPanelBus.getEvents()).toHaveLength(2);
+  });
+
+  it("does not group error calls when the messages differ", () => {
+    const base = { type: "mutation" as const, name: "tasks:add", args: { text: "hi" }, status: "error" as const };
+    convexPanelBus.emit({ id: "a", ...base, error: "permission denied", startedAt: 1, completedAt: 2 });
+    convexPanelBus.emit({ id: "b", ...base, error: "rate limited", startedAt: 3, completedAt: 4 });
+    expect(convexPanelBus.getEvents()).toHaveLength(2);
+  });
+});
+
+describe("extractError", () => {
+  it("extracts message and stack from an Error", () => {
+    const err = new Error("nope");
+    const out = extractError(err);
+    expect(out.error).toBe("nope");
+    expect(out.errorStack).toContain("Error");
+    expect(out.errorData).toBeUndefined();
+  });
+
+  it("extracts ConvexError-style data from the error", () => {
+    class FakeConvexError extends Error {
+      data: unknown;
+      constructor(message: string, data: unknown) {
+        super(message);
+        this.data = data;
+      }
+    }
+    const out = extractError(new FakeConvexError("bad input", { field: "name" }));
+    expect(out.error).toBe("bad input");
+    expect(out.errorData).toEqual({ field: "name" });
+  });
+
+  it("falls back to String(err) for non-Error values", () => {
+    expect(extractError("oops").error).toBe("oops");
+    expect(extractError(42).error).toBe("42");
   });
 });
 
