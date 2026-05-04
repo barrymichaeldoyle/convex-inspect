@@ -12,7 +12,7 @@
   "dependencies": {
     "@astrojs/react": "5.0.4",
     "@astrojs/starlight": "0.38.4",
-    "astro": "6.1.9",
+    "astro": "6.2.1",
     "convex": "1.36.1",
     "convex-inspect": "workspace:*",
     "react": "19.2.5",
