@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
-    "ci:check": "pnpm audit --audit-level low && pnpm lint && pnpm knip && pnpm test && pnpm typecheck && pnpm build",
+    "ci:check": "pnpm audit && pnpm lint && pnpm knip && pnpm test && pnpm typecheck && pnpm build",
     "changeset": "changeset",
     "changeset:status": "changeset status --verbose",
     "changeset:version": "changeset version",
